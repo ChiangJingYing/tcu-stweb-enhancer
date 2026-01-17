@@ -4,8 +4,6 @@
     "version": "1.0",
     "description": "Automated modifications for TCU StWeb Stmain.php",
     "permissions": [
-        "activeTab",
-        "scripting",
         "storage"
     ],
     "content_scripts": [
