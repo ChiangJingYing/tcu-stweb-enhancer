@@ -1,9 +1,15 @@
 async function handleTask1() {
-    const targetXPath = '/html/body/div/form/div[3]/div[2]/div[2]/div/div[2]';
-    const targetElement = Utils.getElementByXPath(targetXPath);
+    const parentXPath = '/html/body/div/form/div[3]/div[2]/div[2]/div';
+    const parentElement = Utils.getElementByXPath(parentXPath);
+
+    let targetElement = null;
+    if (parentElement && parentElement.children.length >= 3) {
+        // Task 1 is 3rd to last (倒數第3個)
+        targetElement = parentElement.children[parentElement.children.length - 3];
+    }
 
     if (!targetElement) {
-        console.warn('Task 1: Target element not found:', targetXPath);
+        console.warn('Task 1: Target element not found (Parent or 3rd to last child missing)');
         return;
     }
 

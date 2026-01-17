@@ -502,8 +502,14 @@ const PinningManager = {
 
         // If container doesn't exist, we need to create it and replace the original target
         if (!container) {
-            const targetXPath = '/html/body/div/form/div[3]/div[2]/div[2]/div/div[3]';
-            const targetElement = Utils.getElementByXPath(targetXPath);
+            const parentXPath = '/html/body/div/form/div[3]/div[2]/div[2]/div';
+            const parentElement = Utils.getElementByXPath(parentXPath);
+
+            let targetElement = null;
+            if (parentElement && parentElement.children.length >= 2) {
+                // Task 2 is 2nd to last (倒數第2個)
+                targetElement = parentElement.children[parentElement.children.length - 2];
+            }
 
             if (!targetElement) return;
 
