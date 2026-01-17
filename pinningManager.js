@@ -89,19 +89,37 @@ const PinningManager = {
 
         // Main Toggle Button
         const btn = document.createElement('button');
-        btn.textContent = '📌';
+        // btn.textContent = '📌'; // Original
+
+        const icon = document.createElement('img');
+        icon.src = chrome.runtime.getURL('pin_icon.png');
+        icon.style.cssText = `
+            width: 500%; 
+            height: 500%;
+            pointer-events: none;
+            display: block;
+            object-fit: cover;
+            border-radius: 50%;
+        `;
+
         btn.style.cssText = `
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      background: #007bff;
-      color: white;
-      border: none;
-      font-size: 24px;
-      cursor: grab;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-      transition: transform 0.2s;
-    `;
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          background: #007bff;
+          color: white;
+          border: none;
+          cursor: grab;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+          transition: transform 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          overflow: hidden; /* Ensure image stays within circle */
+        `;
+
+        btn.appendChild(icon);
 
         // Only toggle if we haven't dragged
         btn.onclick = (e) => {
