@@ -183,7 +183,7 @@ const PinningManager = {
     `;
 
         // Render Menu Content function
-        const renderMenuContent = async () => {
+        PinningManager.renderMenu = async () => {
             menu.innerHTML = ''; // Clear
 
             // 1. Toggle Selection Mode Button
@@ -202,7 +202,7 @@ const PinningManager = {
         `;
             toggleBtn.onclick = () => {
                 PinningManager.toggleSelectionMode();
-                PinningManager.toggleMenu(); // Close menu to let user select
+                // do not Close menu to let user select
             };
             menu.appendChild(toggleBtn);
 
@@ -233,6 +233,7 @@ const PinningManager = {
 
                 pins.forEach((pin, index) => {
                     const row = document.createElement('div');
+                    row.draggable = true; // Enable Drag
                     row.style.cssText = `
                     display: flex;
                     justify-content: space-between;
@@ -242,7 +243,55 @@ const PinningManager = {
                     border-radius: 4px;
                     border: 1px solid #eee;
                     color: #333;
+                    cursor: grab;
                 `;
+
+                    // Drag Events
+                    row.ondragstart = (e) => {
+                        e.dataTransfer.setData('text/plain', index);
+                        row.style.opacity = '0.5';
+                    };
+
+                    row.ondragend = () => {
+                        row.style.opacity = '1';
+                    };
+
+                    row.ondragover = (e) => {
+                        e.preventDefault(); // Necessary for drop
+                        row.style.border = '2px dashed #007bff';
+                    };
+
+                    row.ondragleave = () => {
+                        row.style.border = '1px solid #eee';
+                    };
+
+                    row.ondrop = async (e) => {
+                        e.preventDefault();
+                        const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                        const toIndex = index;
+
+                        if (fromIndex !== toIndex) {
+                            // Reorder Logic
+                            const newPins = [...pins];
+                            const [moved] = newPins.splice(fromIndex, 1);
+                            newPins.splice(toIndex, 0, moved);
+
+                            await Utils.Storage.set(PinningManager.STORAGE_KEY, newPins);
+                            await PinningManager.renderMenu();
+                            await PinningManager.renderTask2Items();
+                        }
+                    };
+
+                    // Drag Handle Icon
+                    const handle = document.createElement('span');
+                    handle.textContent = '≡';
+                    handle.style.cssText = `
+                        margin-right: 8px;
+                        color: #999;
+                        cursor: grab;
+                        font-weight: bold;
+                        font-size: 14px;
+                    `;
 
                     const label = document.createElement('span');
                     label.textContent = pin.name;
@@ -264,13 +313,15 @@ const PinningManager = {
                     margin-left: 5px;
                     padding: 0 5px;
                 `;
-                    delBtn.onclick = async () => {
+                    delBtn.onclick = async (e) => {
+                        e.stopPropagation(); // Prevent drag triggers if any
                         const newPins = pins.filter((_, i) => i !== index);
                         await Utils.Storage.set(PinningManager.STORAGE_KEY, newPins);
-                        await renderMenuContent(); // Re-render menu
+                        await PinningManager.renderMenu(); // Re-render menu
                         await PinningManager.renderTask2Items(); // Re-render main UI
                     };
 
+                    row.appendChild(handle);
                     row.appendChild(label);
                     row.appendChild(delBtn);
                     listContainer.appendChild(row);
@@ -280,13 +331,13 @@ const PinningManager = {
         };
 
         // Initial Render check
-        renderMenuContent();
+        PinningManager.renderMenu();
 
         // Hook render into toggle
         PinningManager.toggleMenu = async () => {
             const menu = document.getElementById('tcu-pin-menu');
             if (menu.style.display === 'none') {
-                await renderMenuContent();
+                await PinningManager.renderMenu();
                 menu.style.display = 'block';
             } else {
                 menu.style.display = 'none';
@@ -295,6 +346,16 @@ const PinningManager = {
 
         fab.appendChild(menu);
         document.body.appendChild(fab);
+
+        // Click Outside to Close
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('tcu-pin-menu');
+            const fab = document.getElementById('tcu-pin-fab');
+            // Only close if NOT selecting
+            if (!PinningManager.isSelecting && menu && menu.style.display === 'block' && fab && !fab.contains(e.target)) {
+                menu.style.display = 'none';
+            }
+        });
     },
 
     toggleMenu: () => {
@@ -305,17 +366,26 @@ const PinningManager = {
         PinningManager.isSelecting = !PinningManager.isSelecting;
         const isSelecting = PinningManager.isSelecting;
 
+        // Update menu button state immediately
+        PinningManager.renderMenu();
+
         if (isSelecting) {
             document.body.style.cursor = 'crosshair';
-            // Add global listener
+            // Add global listeners
             document.addEventListener('click', PinningManager.handleSelectionClick, true);
             document.addEventListener('mouseover', PinningManager.handleMouseOver, true);
             document.addEventListener('mouseout', PinningManager.handleMouseOut, true);
 
+            // ESC key to cancel
+            PinningManager.escHandler = (e) => {
+                if (e.key === 'Escape') PinningManager.toggleSelectionMode();
+            };
+            document.addEventListener('keydown', PinningManager.escHandler);
+
             // Notify user
             const toast = document.createElement('div');
             toast.id = 'selection-toast';
-            toast.textContent = '請點擊您想釘選的功能按鈕 (Click a button to pin)';
+            toast.textContent = '請點擊您想釘選的功能按鈕 (Click to pin) | ESC Cancel';
             toast.style.cssText = `
         position: fixed;
         top: 20px;
@@ -336,8 +406,13 @@ const PinningManager = {
             document.removeEventListener('mouseover', PinningManager.handleMouseOver, true);
             document.removeEventListener('mouseout', PinningManager.handleMouseOut, true);
 
-            // CLEANUP: Remove styles from all potentially highlighted elements
-            const headers = document.querySelectorAll('a.card-header');
+            if (PinningManager.escHandler) {
+                document.removeEventListener('keydown', PinningManager.escHandler);
+                PinningManager.escHandler = null;
+            }
+
+            // CLEANUP: Remove styles from all potentially highlighted elements (A and DIV)
+            const headers = document.querySelectorAll('.card-header');
             headers.forEach(el => {
                 el.style.outline = '';
                 if (el.dataset.originalTransform) {
@@ -353,7 +428,7 @@ const PinningManager = {
     },
 
     handleMouseOver: (e) => {
-        const target = e.target.closest('a.card-header');
+        const target = e.target.closest('.card-header');
         if (target) {
             target.style.outline = '3px solid red';
             target.dataset.originalTransform = target.style.transform;
@@ -362,7 +437,7 @@ const PinningManager = {
     },
 
     handleMouseOut: (e) => {
-        const target = e.target.closest('a.card-header');
+        const target = e.target.closest('.card-header');
         if (target) {
             target.style.outline = '';
             target.style.transform = target.dataset.originalTransform || '';
@@ -372,45 +447,102 @@ const PinningManager = {
     handleSelectionClick: async (e) => {
         if (!PinningManager.isSelecting) return;
 
-        const target = e.target.closest('a.card-header');
+        // Allow both A (collapsed) and DIV (expanded) headers
+        const target = e.target.closest('.card-header');
         if (!target) return;
 
         e.preventDefault();
         e.stopPropagation();
 
         // Extract Data
-        const href = target.getAttribute('href');
-        const nameEl = target.querySelector('.col-9 span');
+        let href = target.getAttribute('href');
+        const nameEl = target.querySelector('.col-9 span') || target.querySelector('.col-9');
+        // Note: Expanded div might just have text inside .col-9 directly or in a child.
+        // User snippet: <div class="col-9" style="font-size:1.5rem;">電子錢包選單</div>
         const name = nameEl ? nameEl.textContent.trim() : 'Unknown Function';
 
-        if (href) {
-            // Validation: Exclude Stmain.php (Menu Toggles)
-            if (href.includes('Stmain.php')) {
-                alert('此為選單展開按鈕，無法釘選 (This is a menu toggle, cannot pin)');
-                return;
+        // Logic to determine type:
+        // 1. Regular Link: Has href AND NOT Stmain.php
+        // 2. Group (Collapsed): Has href AND Stmain.php
+        // 3. Group (Expanded): No href (it's a div)
+
+        let isGroup = false;
+        if (!href) {
+            isGroup = true;
+            // Generate a synthetic href for storage ID
+            href = `group:${name}`;
+        } else if (href.includes('Stmain.php')) {
+            isGroup = true;
+        }
+
+        if (isGroup) {
+            // Search for submenu content
+            // User structure: <div class="card"><div class="card-header">...</div><ul class="list-group">...</ul></div>
+
+            let submenuList = null;
+            const sibling = target.nextElementSibling;
+
+            // Strategy 1: Direct Sibling UL
+            if (sibling && sibling.tagName === 'UL') {
+                submenuList = sibling;
+            }
+            // Strategy 2: Bootstrap standard (.collapse wrapper)
+            else if (sibling && sibling.classList.contains('collapse')) {
+                submenuList = sibling.querySelector('ul');
+            }
+            // Strategy 3: Parent Card lookup
+            else {
+                const card = target.closest('.card');
+                if (card) {
+                    // content usually in the body or list group flush
+                    submenuList = card.querySelector('ul');
+                }
             }
 
-            await PinningManager.addPin(name, href);
-            PinningManager.toggleSelectionMode(); // Turn off
+            if (submenuList) {
+                const links = Array.from(submenuList.querySelectorAll('a')).map(a => ({
+                    name: a.textContent.trim(),
+                    href: a.href
+                }));
+
+                if (links.length > 0) {
+                    await PinningManager.addPin(name, href, 'group', links);
+                    // Continuous Mode: Do NOT turn off
+                    return;
+                }
+            }
+
+            alert('無法偵測到子選單連結，請確認已展開該選單 (Please expand the menu first)');
+
+        } else {
+            // Regular Link
+            await PinningManager.addPin(name, href, 'link');
+            // Continuous Mode: Do NOT turn off
         }
     },
 
-    addPin: async (name, href) => {
+    addPin: async (name, href, type = 'link', items = []) => {
         const current = (await Utils.Storage.get(PinningManager.STORAGE_KEY)) || [];
         if (current.some(p => p.href === href)) {
             alert('Already pinned!');
             return;
         }
 
-        current.push({ name, href });
+        current.push({ name, href, type, items });
         await Utils.Storage.set(PinningManager.STORAGE_KEY, current);
         await PinningManager.renderTask2Items();
+        await PinningManager.renderMenu(); // Update menu list immediately
         alert(`Pinned "${name}"!`);
     },
 
     renderTask2Items: async () => {
         // Strict Check: Only render Task 2 area if no query params
         if (location.search !== '') return;
+
+        // Initialize Editing State if undefined
+        if (typeof PinningManager.isEditingTask2 === 'undefined') {
+            PinningManager.isEditingTask2 = false;
+        }
 
         let container = document.getElementById('task2-container');
 
@@ -423,20 +555,181 @@ const PinningManager = {
 
             container = document.createElement('div');
             container.id = 'task2-container';
-            container.style.padding = '10px';
+            container.style.padding = '35px 10px 10px 10px'; // Extra top padding for buttons
             container.style.display = 'flex';
             container.style.flexWrap = 'wrap';
-            container.style.gap = '10px';
+            container.style.gap = '15px';
             container.style.justifyContent = 'center';
+            container.style.position = 'relative'; // For absolute buttons
 
             targetElement.replaceWith(container);
         } else {
             // If container exists, just clear it to re-render
             container.innerHTML = '';
+            container.style.padding = '35px 10px 10px 10px'; // Ensure padding is correct
         }
 
         const pins = (await Utils.Storage.get(PinningManager.STORAGE_KEY)) || [];
 
+        // --- Helper: Insertion Marker ---
+        let marker = document.getElementById('drag-marker');
+        if (!marker) {
+            marker = document.createElement('div');
+            marker.id = 'drag-marker';
+            marker.style.cssText = `
+                position: absolute;
+                width: 4px; /* Thicker */
+                height: 30px;
+                background-color: #007bff;
+                display: none;
+                pointer-events: none;
+                z-index: 1000;
+                box-shadow: 0 0 4px rgba(0, 123, 255, 0.5);
+                border-radius: 2px;
+            `;
+            document.body.appendChild(marker);
+        } else {
+            // Ensure style update if it exists
+            marker.style.width = '4px';
+        }
+
+        // --- Helper: Edit Wrapper ---
+        const enhanceForEditing = (element, index) => {
+            if (!PinningManager.isEditingTask2) return element;
+
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'relative';
+            wrapper.draggable = true;
+            wrapper.style.cursor = 'grab';
+
+            // disable underlying interactions
+            const links = element.tagName === 'A' ? [element] : element.getElementsByTagName('a');
+            for (let link of links) {
+                link.style.pointerEvents = 'none';
+                link.onclick = (e) => e.preventDefault();
+            }
+            if (element.tagName === 'DIV' && element.classList.contains('tcu-pinned-dropdown')) {
+                const btns = element.getElementsByTagName('button');
+                for (let btn of btns) btn.disabled = true;
+            }
+
+            wrapper.appendChild(element);
+
+            // Delete Button
+            const delBtn = document.createElement('div');
+            delBtn.textContent = '✕';
+            delBtn.title = '刪除';
+            delBtn.style.cssText = `
+                position: absolute;
+                top: -8px;
+                right: -8px;
+                width: 20px;
+                height: 20px;
+                background: #dc3545;
+                color: white;
+                border: 2px solid white;
+                border-radius: 50%;
+                text-align: center;
+                line-height: 16px;
+                font-size: 12px;
+                cursor: pointer;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                z-index: 100;
+                font-weight: bold;
+            `;
+            delBtn.onclick = async (e) => {
+                e.stopPropagation();
+
+                // If this is the active drag item, we might have issues, but unlikely
+                const newPins = pins.filter((_, i) => i !== index);
+                await Utils.Storage.set(PinningManager.STORAGE_KEY, newPins);
+                await PinningManager.renderTask2Items();
+                await PinningManager.renderMenu();
+            };
+            wrapper.appendChild(delBtn);
+
+            // Drag Logic
+            wrapper.ondragstart = (e) => {
+                e.dataTransfer.setData('text/plain', index);
+                wrapper.style.opacity = '0.4';
+            };
+            wrapper.ondragend = () => {
+                wrapper.style.opacity = '1';
+                marker.style.display = 'none';
+            };
+
+            wrapper.ondragover = (e) => {
+                e.preventDefault(); // allow drop
+
+                const rect = wrapper.getBoundingClientRect();
+                const midX = rect.left + rect.width / 2;
+                const isLeft = e.clientX < midX;
+
+                // GAP Logic: 15px gap
+                const gap = 15;
+                const markerWidth = 4;
+                const offset = (gap / 2) + (markerWidth / 2); // 7.5 + 2 = 9.5
+
+                let markerLeft;
+                if (isLeft) {
+                    // Marker should be centered in the gap to the left of the element
+                    markerLeft = rect.left - offset;
+                } else {
+                    // Marker should be centered in the gap to the right of the element
+                    markerLeft = rect.right + (gap / 2) - (markerWidth / 2);
+                }
+
+                // Show Marker
+                marker.style.display = 'block';
+                marker.style.height = (rect.height + 4) + 'px'; // Slightly taller
+                marker.style.top = (rect.top + window.scrollY - 2) + 'px';
+                marker.style.left = (markerLeft + window.scrollX) + 'px';
+
+                // Store intended position on the target for Drop
+                wrapper.dataset.dropSide = isLeft ? 'before' : 'after';
+            };
+
+            wrapper.ondragleave = (e) => {
+                if (e.relatedTarget && !wrapper.contains(e.relatedTarget)) {
+                    marker.style.display = 'none';
+                }
+            };
+
+            wrapper.ondrop = async (e) => {
+                e.preventDefault();
+                marker.style.display = 'none';
+
+                const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                if (isNaN(fromIndex)) return;
+
+                let toIndex = index;
+                const dropSide = wrapper.dataset.dropSide;
+
+                if (dropSide === 'after') {
+                    toIndex = index + 1;
+                }
+
+                if (fromIndex === index) return;
+
+                const newPins = [...pins];
+                const [movedItem] = newPins.splice(fromIndex, 1);
+
+                let insertAt = toIndex;
+                if (fromIndex < insertAt) {
+                    insertAt--;
+                }
+
+                newPins.splice(insertAt, 0, movedItem);
+
+                await Utils.Storage.set(PinningManager.STORAGE_KEY, newPins);
+                await PinningManager.renderTask2Items();
+                await PinningManager.renderMenu();
+            };
+
+            return wrapper;
+        };
+
+        // --- Render Items ---
         const createBtn = (name, url, baseColor = '#17a2b8', hoverColor = '#138496') => {
             const btn = document.createElement('a');
             btn.href = url;
@@ -451,22 +744,150 @@ const PinningManager = {
             text-decoration: none;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             transition: background-color 0.2s;
+            position: relative;
         `;
             btn.onmouseover = () => btn.style.backgroundColor = hoverColor;
             btn.onmouseout = () => btn.style.backgroundColor = baseColor;
             return btn;
         };
 
+        const createDropdown = (name, items) => {
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = `
+            position: relative;
+            display: inline-block;
+        `;
+
+            const btn = document.createElement('button');
+            btn.type = 'button'; // Prevent form submission
+            btn.textContent = name + ' ▼';
+            btn.style.cssText = `
+            display: inline-block;
+            padding: 8px 16px;
+            color: #fff;
+            background-color: #6c757d;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: background-color 0.2s;
+        `;
+            btn.onmouseover = () => btn.style.backgroundColor = '#5a6268';
+            btn.onmouseout = () => btn.style.backgroundColor = '#6c757d';
+
+            const menu = document.createElement('div');
+            menu.style.cssText = `
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            min-width: 160px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 1000;
+            flex-direction: column;
+        `;
+
+            items.forEach(item => {
+                const link = document.createElement('a');
+                link.href = item.href;
+                link.target = '_blank';
+                link.textContent = item.name;
+                link.style.cssText = `
+                display: block;
+                padding: 8px 12px;
+                color: #333;
+                text-decoration: none;
+                font-size: 14px;
+                transition: background 0.2s;
+                white-space: nowrap;
+            `;
+                link.onmouseover = () => link.style.background = '#f8f9fa';
+                link.onmouseout = () => link.style.background = 'white';
+                menu.appendChild(link);
+            });
+
+            // Toggle Logic
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                // Close others
+                document.querySelectorAll('.tcu-pinned-dropdown').forEach(m => {
+                    if (m !== menu) m.style.display = 'none';
+                });
+                menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+            };
+
+            menu.classList.add('tcu-pinned-dropdown'); // Marker for closing
+
+            wrapper.appendChild(btn);
+            wrapper.appendChild(menu);
+
+            // Global click to close
+            document.addEventListener('click', (e) => {
+                if (!wrapper.contains(e.target)) menu.style.display = 'none';
+            });
+
+            return wrapper;
+        };
+
         const defaultBtn = createBtn('開啟 iCan', 'https://admin.tcu.edu.tw/TCUstweb/TranIcan.php', '#007bff', '#0056b3');
         container.appendChild(defaultBtn);
 
-        pins.forEach(pin => {
+        pins.forEach((pin, index) => {
             if (pin.name && pin.href) {
-                const btn = createBtn(pin.name, pin.href);
-                container.appendChild(btn);
+                let elem;
+                if (pin.type === 'group' && pin.items && pin.items.length > 0) {
+                    elem = createDropdown(pin.name, pin.items);
+                } else {
+                    elem = createBtn(pin.name, pin.href);
+                }
+                container.appendChild(enhanceForEditing(elem, index));
             }
         });
-    }
+
+        // --- Toolbar (Absolute Top Right) ---
+        const toolbar = document.createElement('div');
+        toolbar.style.cssText = `
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            display: flex;
+            gap: 5px;
+        `;
+
+
+        // Edit/Done Button
+        const editBtn = document.createElement('button');
+        editBtn.innerHTML = PinningManager.isEditingTask2 ? '✓' : '✎';
+        editBtn.title = PinningManager.isEditingTask2 ? '完成 (Done)' : '編輯 (Edit)';
+        editBtn.style.cssText = `
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: none;
+            background-color: ${PinningManager.isEditingTask2 ? '#28a745' : '#ffc107'};
+            color: ${PinningManager.isEditingTask2 ? 'white' : '#333'};
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            font-size: 16px;
+            transition: all 0.2s;
+        `;
+        editBtn.onclick = () => {
+            PinningManager.isEditingTask2 = !PinningManager.isEditingTask2;
+            PinningManager.renderTask2Items();
+        };
+        toolbar.appendChild(editBtn);
+
+        container.appendChild(toolbar);
+    },
+
+    // Property to store original pins when entering edit mode
+    // originalPins: null, // Removed feature
 };
 
 async function handleTask1() {
