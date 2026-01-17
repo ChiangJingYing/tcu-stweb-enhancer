@@ -4,9 +4,11 @@
     "version": "1.0",
     "description": "慈濟大學 StWeb 系統優化工具，提供首頁自動查詢、iCan 快速入口及自定義快捷功能釘選，提升校務系統操作體驗。",
     "icons": {
-        "16": "pin_icon.png",
-        "48": "pin_icon.png",
-        "128": "pin_icon.png"
+        "16": "icon16.png",
+        "32": "icon32.png",
+        "48": "icon48.png",
+        "128": "icon128.png",
+        "400": "icon.png"
     },
     "permissions": [
         "storage"
