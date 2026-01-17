@@ -2,7 +2,12 @@
     "manifest_version": 3,
     "name": "TCU StWeb Tool",
     "version": "1.0",
-    "description": "Automated modifications for TCU StWeb Stmain.php",
+    "description": "慈濟大學 StWeb 系統優化工具，提供首頁自動查詢、iCan 快速入口及自定義快捷功能釘選，提升校務系統操作體驗。",
+    "icons": {
+        "16": "pin_icon.png",
+        "48": "pin_icon.png",
+        "128": "pin_icon.png"
+    },
     "permissions": [
         "storage"
     ],
