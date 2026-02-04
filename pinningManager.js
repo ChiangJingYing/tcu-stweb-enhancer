@@ -520,7 +520,7 @@ const PinningManager = {
 
         // If container doesn't exist, we need to create it and replace the original target
         if (!container) {
-            const parentXPath = '/html/body/div/form/div[3]/div[2]/div[2]/div';
+            const parentXPath = '/html/body/form/div[3]/div[2]/div[2]/div';
             const parentElement = Utils.getElementByXPath(parentXPath);
 
             let targetElement = null;

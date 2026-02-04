@@ -1,5 +1,5 @@
 async function handleTask1() {
-    const parentXPath = '/html/body/div/form/div[3]/div[2]/div[2]/div';
+    const parentXPath = '/html/body/form/div[3]/div[2]/div[2]/div';
     const parentElement = Utils.getElementByXPath(parentXPath);
 
     let targetElement = null;
@@ -33,7 +33,7 @@ async function handleTask1() {
         const htmlContent = await Utils.fetchContent(url, options);
         const sourceDoc = Utils.parseHTML(htmlContent);
 
-        const sourceXPath = '/html/body/div/form/table/tbody/tr[3]/td/table';
+        const sourceXPath = '/html/body/form/table/tbody/tr[3]/td/table';
         const sourceElement = Utils.getElementByXPath(sourceXPath, sourceDoc);
 
         if (sourceElement) {
