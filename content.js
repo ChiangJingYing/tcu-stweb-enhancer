@@ -10,15 +10,22 @@ async function init() {
 
         // Fix Navbar Link (Task Requirement 1) - Polling Retry
         const fixNavbar = setInterval(() => {
-            const navLinkEl = Utils.getElementByXPath('/html/body/div[1]/nav/a');
-            if (navLinkEl) {
-                navLinkEl.href = 'https://admin.tcu.edu.tw/TCUstweb/Stmain.php';
-                clearInterval(fixNavbar);
+            // Target the span with the specific text content
+            const navLinkEl = document.querySelector('span.text-white');
+            if (navLinkEl && navLinkEl.textContent.includes('慈濟大學 學生資訊系統')) {
+                // Get the parent div and make it clickable
+                const parentDiv = navLinkEl.parentElement;
+                if (parentDiv) {
+                    parentDiv.style.cursor = 'pointer';
+                    parentDiv.onclick = () => {
+                        window.location.href = 'https://admin.tcu.edu.tw/TCUstweb/Stmain.php';
+                    };
+                    clearInterval(fixNavbar);
+                }
             }
         }, 200);
         // Stop polling after 5 seconds
         setTimeout(() => clearInterval(fixNavbar), 5000);
-
         const isCleanUrl = location.search === '';
 
         if (isStmain) {
