@@ -20,7 +20,7 @@ async function handleTask1() {
     const paramStart = `${rocYear}${month}01`;
     const paramEnd = `${rocYear}${month}32`;
 
-    const url = 'https://admin.tcu.edu.tw/TCUstweb/acc/stMscQry.php';
+    const url = 'https://admin.tcu.edu.tw/TCUstweb/acc/stMscQry.php?&nPg=';
     const options = {
         method: 'POST',
         headers: {
