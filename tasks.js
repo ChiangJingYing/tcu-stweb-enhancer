@@ -18,7 +18,7 @@ async function handleTask1() {
     const rocYear = now.getFullYear() - 1911;
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const paramStart = `${rocYear}${month}01`;
-    const paramEnd = `${rocYear}${month}32`;
+    const paramEnd = `${rocYear}${month+1}32`;
 
     const url = 'https://admin.tcu.edu.tw/TCUstweb/acc/stMscQry.php?&nPg=';
     const options = {
@@ -33,18 +33,43 @@ async function handleTask1() {
         const htmlContent = await Utils.fetchContent(url, options);
         const sourceDoc = Utils.parseHTML(htmlContent);
 
-        const sourceXPath = '/html/body/form/table/tbody/tr[3]/td/table';
+        const sourceXPath = '/html/body/form/div/div/div[2]/div[2]/table';
         const sourceElement = Utils.getElementByXPath(sourceXPath, sourceDoc);
 
         if (sourceElement) {
-            const importedNode = document.importNode(sourceElement, true);
-            targetElement.innerHTML = '';
-            targetElement.appendChild(importedNode);
-            targetElement.replaceWith(importedNode);
-            console.log('Task 1: Success');
-        } else {
-            console.warn('Task 1: Source element not found in response');
-        }
+    const iframe = document.createElement('iframe');
+    iframe.style.width = '100%';
+    // iframe.style.height = '500px';
+
+    const iframeHTML = `
+    <html>
+    <head>
+        <base href="${url}">
+        <style>
+            table {
+                border-collapse: collapse;
+                margin: 0 auto; /* 表格本身置中 */
+                font-size: 80%;
+            }
+            th, td {
+                text-align: center; /* 內容置中 */
+                vertical-align: middle;
+            }
+        </style>
+    </head>
+    <body>
+        ${sourceElement.outerHTML}
+    </body>
+    </html>
+`;
+
+    iframe.srcdoc = iframeHTML;
+
+    targetElement.innerHTML = '';
+    targetElement.appendChild(iframe);
+
+    console.log('Task 1: Success (iframe)');
+}
     } catch (e) {
         console.error('Task 1 Error:', e);
     }
