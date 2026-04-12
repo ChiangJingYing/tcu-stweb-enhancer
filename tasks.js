@@ -33,13 +33,13 @@ async function handleTask1() {
         const htmlContent = await Utils.fetchContent(url, options);
         const sourceDoc = Utils.parseHTML(htmlContent);
 
-        const sourceXPath = '/html/body/form/div/div/div[2]/div[2]/table';
+        const sourceXPath = '/html/body/form/div/div/div[2]/div[3]/table';
         const sourceElement = Utils.getElementByXPath(sourceXPath, sourceDoc);
 
         if (sourceElement) {
     const iframe = document.createElement('iframe');
     iframe.style.width = '100%';
-    // iframe.style.height = '500px';
+    iframe.style.height = 'auto';
 
     const iframeHTML = `
     <html>
@@ -47,9 +47,9 @@ async function handleTask1() {
         <base href="${url}">
         <style>
             table {
+                height: auto;
                 border-collapse: collapse;
                 margin: 0 auto; /* 表格本身置中 */
-                font-size: 80%;
             }
             th, td {
                 text-align: center; /* 內容置中 */
